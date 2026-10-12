@@ -1,0 +1,25 @@
+{
+  "name": "agents-jones-ui",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @aj/server\" \"npm run dev -w @aj/web\"",
+    "build": "npm run build -w @aj/web",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/web",
+    "test": "vitest run",
+    "probe": "npm run probe -w @aj/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
