@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import musicUrl from '../../../../media/monolith.mp3';
+
+// Music is optional and never committed: drop an mp3 you have the rights to into media/
+// (gitignored). The first one alphabetically plays; with none, the sound button is hidden.
+const tracks = import.meta.glob<string>('../../../../media/*.mp3', { eager: true, query: '?url', import: 'default' });
+const musicUrl = Object.keys(tracks)
+  .sort()
+  .map((k) => tracks[k])[0];
 
 const STORAGE_KEY = 'aj:sound';
 const VOLUME = 0.35;
@@ -14,6 +20,7 @@ export function useBackgroundMusic() {
   const audioRef = useRef<HTMLAudioElement>();
 
   useEffect(() => {
+    if (!musicUrl) return;
     const audio = new Audio(musicUrl);
     audio.loop = true;
     audio.volume = VOLUME;
@@ -51,5 +58,5 @@ export function useBackgroundMusic() {
     return removeUnlock;
   }, [enabled]);
 
-  return { enabled, toggle: () => setEnabled((on) => !on) };
+  return { available: Boolean(musicUrl), enabled, toggle: () => setEnabled((on) => !on) };
 }

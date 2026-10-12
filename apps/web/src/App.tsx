@@ -132,15 +132,17 @@ export function App() {
           onSpeed={setSpeed}
         />
         <div className="topbar-status">
-          <button
-            type="button"
-            className={`pill sound-pill${sound.enabled ? ' on' : ''}`}
-            onClick={sound.toggle}
-            aria-pressed={sound.enabled}
-            aria-label="Background music"
-          >
-            Sound: {sound.enabled ? 'on' : 'off'}
-          </button>
+          {sound.available && (
+            <button
+              type="button"
+              className={`pill sound-pill${sound.enabled ? ' on' : ''}`}
+              onClick={sound.toggle}
+              aria-pressed={sound.enabled}
+              aria-label="Background music"
+            >
+              Sound: {sound.enabled ? 'on' : 'off'}
+            </button>
+          )}
           <span className={`pill ${connected ? 'ok' : 'bad'}`}>{connected ? 'stream on' : 'stream off'}</span>
           <button type="button" className="pill brain-pill" onClick={() => setOpenLocationId('brain:team-brain')}>
             Team Brain: {data?.brain.connected ? 'on' : 'soon'}

@@ -8,7 +8,6 @@ A *Jones in the Fast Lane*-style board for watching and steering agents across p
 - **Meters** (Jones's four goals): Cost (wealth), Success (happiness), Knowledge (education, fed by the Team Brain), Output (career).
 - **Team Brain** sits in the town square. It is a placeholder until the shared-context MCP exists.
 
-Game concepts are loosely inspired by [openjones](https://github.com/dimidd/openjones). No code or art is taken from it.
 
 ## Run
 
@@ -60,3 +59,13 @@ Add a platform by implementing `AgentAdapter` (`apps/server/src/adapters/types.t
 ## Security
 
 Tokens and cookies are read from `.env` on the server only. They are never logged or sent to the browser. The server binds to `127.0.0.1`. Every control action asks for confirmation in the UI.
+
+## Music
+
+No music ships with the repo. To get background music, put an mp3 you have the rights to in `media/` (gitignored). The first file alphabetically plays on loop, and a Sound on/off button appears in the top bar.
+
+## Credits
+
+- **Game design inspiration:** [openjones](https://github.com/dimidd/openjones) by [Dimid Duchovny](https://github.com/dimidd), an open-source take on *Jones in the Fast Lane*. The town grid, routes, timed actions and goal meters here are re-implemented from its ideas. No code or art is copied. openjones does not state a license or attribution terms, so this is a thank-you rather than a license notice.
+- ***Jones in the Fast Lane*** was published by Sierra On-Line (1990). This project is an unofficial homage and is not affiliated with its rights holders.
+- **Music discovery:** game soundtracks were browsed on [KHInsider](https://downloads.khinsider.com/). KHInsider grants no license to reuse its tracks, and they remain the property of their rights holders, so none are included here.

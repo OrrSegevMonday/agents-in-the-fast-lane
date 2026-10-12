@@ -7,3 +7,4 @@ dist
 .claude/launch.json
 locations.local.json
 apps/server/data
+media/*.mp3
