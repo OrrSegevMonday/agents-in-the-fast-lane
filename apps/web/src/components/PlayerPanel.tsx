@@ -13,7 +13,7 @@ export function PlayerPanel({ agent, turns, at, onControl }: { agent: Agent; tur
   return (
     <section className="panel player-panel" aria-label={`${agent.name} details`}>
       <header className="player-header" style={{ ['--token-color' as string]: PLATFORM_COLORS[agent.platform] }}>
-        <AgentSprite color={PLATFORM_COLORS[agent.platform]} size={40} />
+        <AgentSprite color={PLATFORM_COLORS[agent.platform]} icon={agent.icon} size={40} />
         <div>
           <h2>{agent.name}</h2>
           <p className="muted">

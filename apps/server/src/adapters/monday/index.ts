@@ -12,6 +12,7 @@ import {
 import type { Config } from '../../config.ts';
 import { AdapterError, type AdapterContext, type AgentAdapter } from '../types.ts';
 import { MondayGraphql, MondayMcp } from './client.ts';
+import { boardIdCandidates } from './boards.ts';
 import { annotateWithJob, type ScheduledJob } from './jobs.ts';
 import { groupIntoTurns, parseActivityTimestamp, type ActivityEvent } from './turns.ts';
 
@@ -20,6 +21,9 @@ interface RawAgent {
   kind?: string;
   state?: string;
   goal?: string;
+  /** Agent-level instructions. Some agents keep all their work here and leave jobs empty. */
+  identity?: string;
+  plan?: string;
   profile?: { name?: string; role?: string; avatar_url?: string };
 }
 
@@ -45,10 +49,9 @@ interface PendingRun {
 
 const BACKFILL_DAYS = 14;
 /** Bump when inferred-turn logic changes, so stored history is rebuilt once. */
-const INFERENCE_VERSION = 3;
+const INFERENCE_VERSION = 4;
 const INFERENCE_KEY = (id: string) => `monday:inference-version:${id}`;
 const PENDING_KEY = (id: string) => `monday:pending:${id}`;
-const BOARD_ID_IN_TEXT = /`(\d{10,12})`/g;
 
 export class MondayAdapter implements AgentAdapter {
   platform = 'monday' as const;
@@ -58,6 +61,7 @@ export class MondayAdapter implements AgentAdapter {
   private meta = new Map<string, AgentMeta>();
   private meId?: string;
   private pending = new Map<string, PendingRun[]>();
+  private boardCache = new Map<string, string[]>();
 
   constructor(
     private cfg: Config['monday'],
@@ -86,7 +90,7 @@ export class MondayAdapter implements AgentAdapter {
         });
         const jobs: AgentJob[] = (jobsRes.jobs ?? []).map((j) => ({
           id: j.job_id,
-          name: j.name,
+          name: jobLabel(j),
           enabled: j.enabled,
           instructions: j.instructions,
         }));
@@ -204,6 +208,8 @@ export class MondayAdapter implements AgentAdapter {
 
     const events: ActivityEvent[] = [];
     for (const board of data.boards) {
+      // A board only becomes a building once the agent actually did something there.
+      if (!board.activity_logs.length) continue;
       const loc = ctx.locations.ensure('board', board.id, board.name, this.boardUrl(board.id));
       for (const log of board.activity_logs) {
         events.push({
@@ -303,8 +309,10 @@ export class MondayAdapter implements AgentAdapter {
 
   private async resolveMeta(nativeId: string, raw: RawAgent, jobs: RawJob[], ctx: AdapterContext) {
     const cached = this.meta.get(nativeId);
-    const boardIds = new Set<string>();
-    for (const job of jobs) for (const m of (job.instructions ?? '').matchAll(BOARD_ID_IN_TEXT)) boardIds.add(m[1]!);
+    const agentInstructions = raw.identity || raw.plan;
+    const boardIds = await this.confirmBoards(
+      boardIdCandidates(agentInstructions, ...jobs.map((j) => j.instructions)),
+    );
 
     let userId = cached?.userId;
     if (!userId) {
@@ -320,12 +328,28 @@ export class MondayAdapter implements AgentAdapter {
       userId,
       ownerId: this.meId,
       personal: raw.kind === 'PERSONAL',
-      boardIds: [...boardIds],
-      jobs,
+      boardIds,
+      // Jobs without their own instructions run on the agent's, so infer tools from those.
+      jobs: jobs.map((j) => ({ ...j, name: jobLabel(j), instructions: j.instructions || agentInstructions })),
     };
     this.meta.set(nativeId, meta);
-    if (!cached) ctx.log('monday agent resolved', { agent: nativeId, userId, personal: meta.personal, boardIds: meta.boardIds });
+    if (!cached || cached.boardIds.join() !== boardIds.join()) ctx.log('monday agent resolved', { agent: nativeId, userId, personal: meta.personal, boardIds: meta.boardIds });
     return meta;
+  }
+
+  /** Keeps only candidates that are real boards. Cached, since instructions rarely change. */
+  private async confirmBoards(candidates: string[]): Promise<string[]> {
+    if (!candidates.length) return [];
+    const key = [...candidates].sort().join(',');
+    const hit = this.boardCache.get(key);
+    if (hit) return hit;
+    const { boards } = await this.gql.query<{ boards: { id: string }[] }>(
+      'query($ids:[ID!]) { boards(ids: $ids, limit: 100) { id } }',
+      { ids: candidates },
+    );
+    const confirmed = candidates.filter((id) => boards.some((b) => b.id === id));
+    this.boardCache.set(key, confirmed);
+    return confirmed;
   }
 
   private boardUrl(boardId: string) {
@@ -345,6 +369,11 @@ export class MondayAdapter implements AgentAdapter {
     this.pending.set(agentKey, runs);
     this.kv.setKv(PENDING_KEY(agentKey), runs);
   }
+}
+
+/** Some jobs are created without a name. */
+function jobLabel(job: { name?: string }) {
+  return job.name?.trim() || 'Scheduled run';
 }
 
 function pickAgent(res: unknown): RawAgent {

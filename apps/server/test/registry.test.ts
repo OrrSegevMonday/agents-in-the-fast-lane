@@ -46,3 +46,31 @@ describe('LocationRegistry', () => {
     expect(seen.filter((id) => id === 'service:datadog')).toHaveLength(1);
   });
 });
+
+describe('LocationRegistry.rebalance', () => {
+  it('frees unvisited slots for visited buildings in the annex, busiest first', () => {
+    const reg = new LocationRegistry(memorySink(), () => {}, []);
+    const filler = Array.from({ length: BOARD_SLOTS }, (_, i) => reg.ensure('board', `b${i}`));
+    const quiet = reg.ensure('board', 'quiet');
+    const busy = reg.ensure('board', 'busy');
+    expect(quiet.slot).toBeNull();
+    expect(busy.slot).toBeNull();
+
+    // Only the first board was visited; the rest of the ring is stale.
+    const visits = new Map([[filler[0]!.id, 3], [quiet.id, 1], [busy.id, 9]]);
+    reg.rebalance(visits);
+
+    expect(reg.get(filler[0]!.id)!.slot).toBe(filler[0]!.slot);
+    expect(reg.get(busy.id)!.slot).not.toBeNull();
+    expect(reg.get(quiet.id)!.slot).not.toBeNull();
+    expect(reg.get(busy.id)!.slot!).toBeLessThan(reg.get(quiet.id)!.slot!);
+    expect(reg.get(filler[1]!.id)!.slot).toBeNull();
+  });
+
+  it('never moves pinned buildings and does nothing when no one is waiting', () => {
+    const reg = new LocationRegistry(memorySink());
+    const before = reg.list().map((l) => [l.id, l.slot]);
+    expect(reg.rebalance(new Map())).toEqual([]);
+    expect(reg.list().map((l) => [l.id, l.slot])).toEqual(before);
+  });
+});

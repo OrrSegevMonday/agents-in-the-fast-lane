@@ -28,6 +28,15 @@ Nothing account-specific lives in the code. You can also copy `.env.example` to 
 
 Other scripts: `npm test`, `npm run typecheck`, `npm run probe` (reports which run-history sources each live platform exposes).
 
+## Setup screen
+
+Click **Setup** in the top bar to manage the app without editing files:
+
+- **Keys and tokens**: one slot per system (monday, Sphera, GitHub). Values are written to your local `.env` (created on first use, mode 600, kept in `.gitignore`) and are never shown again; the UI only displays `*****`.
+- **Agents**: paste an agent URL and the server resolves and verifies it through the system's API/MCP. **Disable** keeps the settings but stops tracking; **Delete** removes the agent and its saved history from this app.
+
+After the first run the agent list lives in the local database; `MONDAY_AGENT_IDS` / `SPHERA_AGENT_IDS` only seed it.
+
 ## Adapters
 
 | Platform | Status | Turns come from | Controls |

@@ -6,6 +6,7 @@ import type { BrainProvider } from './brain/provider.ts';
 import { bus } from './bus.ts';
 import type { LocationRegistry } from './locations/registry.ts';
 import type { Poller } from './poller.ts';
+import type { AgentRegistry } from './setup/registry.ts';
 import type { Store } from './store/sqlite.ts';
 
 interface Deps {
@@ -13,6 +14,7 @@ interface Deps {
   locations: LocationRegistry;
   poller: Poller;
   brain: BrainProvider;
+  registry: AgentRegistry;
 }
 
 const TurnsQuery = z.object({
@@ -20,12 +22,14 @@ const TurnsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(2000).default(500),
 });
 
-export function registerRoutes(app: FastifyInstance, { store, locations, poller, brain }: Deps) {
+export function registerRoutes(app: FastifyInstance, { store, locations, poller, brain, registry }: Deps) {
   // History of agents whose adapter is now off (e.g. MOCK_AGENTS=false) stays in the store but isn't shown.
-  const activeAgents = () => store.listAgents().filter((a) => poller.isActive(a.id));
+  // Disabled agents are skipped too, even if they were reported before being switched off.
+  const isTracked = (id: string) => poller.isActive(id) && registry.get(id)?.enabled !== false;
+  const activeAgents = () => store.listAgents().filter((a) => isTracked(a.id));
 
   app.get('/api/state', async (): Promise<GameState> => {
-    const turns = store.listTurns(undefined, 2000).filter((t) => poller.isActive(t.agentId));
+    const turns = store.listTurns(undefined, 2000).filter((t) => isTracked(t.agentId));
     const visited = new Set(turns.flatMap((t) => t.actions.map((a) => a.locationId)));
     return {
       agents: activeAgents(),
@@ -45,14 +49,14 @@ export function registerRoutes(app: FastifyInstance, { store, locations, poller,
   app.get('/api/turns', async (req, reply) => {
     const parsed = TurnsQuery.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues });
-    return store.listTurns(parsed.data.agentId, parsed.data.limit).filter((t) => poller.isActive(t.agentId));
+    return store.listTurns(parsed.data.agentId, parsed.data.limit).filter((t) => isTracked(t.agentId));
   });
 
   app.post<{ Params: { id: string } }>('/api/agents/:id/control', async (req, reply): Promise<ControlResponse> => {
     const parsed = ControlRequestSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ ok: false, message: 'Invalid control request' });
 
-    const agent = poller.isActive(req.params.id) ? store.getAgent(req.params.id) : undefined;
+    const agent = isTracked(req.params.id) ? store.getAgent(req.params.id) : undefined;
     if (!agent) return reply.code(404).send({ ok: false, message: 'Unknown agent' });
     const adapter = poller.adapterFor(agent);
     if (!adapter) return reply.code(404).send({ ok: false, message: 'No adapter for this platform' });

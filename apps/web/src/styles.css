@@ -841,3 +841,139 @@ a {
   box-shadow: 4px 4px 0 var(--ink);
   padding: 10px 14px;
 }
+
+/* Setup screen */
+.setup {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+.setup-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.setup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.setup-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.setup-row .field {
+  flex: 1;
+}
+.secret-mask {
+  font-family: var(--mono);
+  color: var(--muted);
+}
+.setup-agent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.setup-agent.disabled .setup-agent-name {
+  opacity: 0.55;
+}
+.setup-actions {
+  display: flex;
+  gap: 8px;
+}
+.layout[hidden] { display: none; }
+
+/* Building kinds: accent frame and name tag, matched in the legend */
+
+.building {
+  border-color: color-mix(in srgb, var(--kind-color, transparent) 55%, transparent);
+}
+
+.building .building-name {
+  border-bottom: 3px solid var(--kind-color, var(--ink));
+}
+
+.building.brain {
+  --kind-color: #ff8fab;
+}
+
+.left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legend-btn {
+  align-self: stretch;
+}
+
+.legend ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.legend li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  background: var(--night);
+  border: 3px solid var(--ink);
+  border-left: 6px solid var(--kind-color);
+}
+
+.legend-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.legend-label {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--kind-color);
+}
+
+.legend-count {
+  color: var(--muted);
+}
+
+.legend-desc {
+  font-size: 11px;
+}
+
+.legend-note {
+  font-size: 11px;
+  margin: 10px 0 0;
+}
+
+.legend-heading {
+  margin: 18px 0 4px;
+}
+
+.legend ul.icon-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.legend .icon-gallery li {
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 4px;
+  border-left-width: 3px;
+  border-left-color: #8b5cff;
+  font-size: 10px;
+  text-align: center;
+}

@@ -64,6 +64,36 @@ export class LocationRegistry {
     return [...this.byId.values()];
   }
 
+  /**
+   * Keeps the ring for places agents actually use. Frees slots held by unpinned buildings
+   * nobody has visited, then gives free slots to visited buildings waiting in the annex,
+   * busiest first. Visited buildings never lose their slot. Returns what moved.
+   */
+  rebalance(visits: Map<string, number>): Location[] {
+    const pinned = new Set(this.known.filter((k) => k.pinned).map((k) => locationId(k.kind, normalizeRef(k.kind, k.ref))));
+    const moved: Location[] = [];
+    const waiting = this.list()
+      .filter((l) => l.slot === null && l.kind !== 'brain' && (visits.get(l.id) ?? 0) > 0)
+      .sort((a, b) => (visits.get(b.id) ?? 0) - (visits.get(a.id) ?? 0));
+    if (!waiting.length) return moved;
+
+    for (const loc of this.list()) {
+      if (loc.slot !== null && !pinned.has(loc.id) && !visits.get(loc.id)) {
+        const freed = { ...loc, slot: null };
+        this.save(freed);
+        moved.push(freed);
+      }
+    }
+    for (const loc of waiting) {
+      const slot = this.nextFreeSlot();
+      if (slot === null) break;
+      const placed = { ...loc, slot };
+      this.save(placed);
+      moved.push(placed);
+    }
+    return moved;
+  }
+
   private seed() {
     if (!this.byId.has(BRAIN_LOCATION_ID)) {
       this.save({ id: BRAIN_LOCATION_ID, kind: 'brain', ref: 'team-brain', name: 'Team Brain', slot: null });

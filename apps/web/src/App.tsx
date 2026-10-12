@@ -1,8 +1,12 @@
 import type { AgentAction, Turn } from '@aj/shared';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fetchSetup } from './api/client.ts';
 import { Board } from './components/Board.tsx';
+import { Legend } from './components/Legend.tsx';
 import { BuildingInterior } from './components/BuildingInterior.tsx';
 import { ControlDialog, type ControlKind } from './components/ControlDialog.tsx';
+import { SetupScreen, SETUP_KEY } from './components/SetupScreen.tsx';
 import { PlayerPanel } from './components/PlayerPanel.tsx';
 import { Roster } from './components/Roster.tsx';
 import { Timeline, type Speed } from './components/Timeline.tsx';
@@ -23,8 +27,19 @@ export function App() {
   const [cursor, setCursor] = useState(() => Date.now());
   const [selectedId, setSelectedId] = useState<string>();
   const [openLocationId, setOpenLocationId] = useState<string>();
+  const [showLegend, setShowLegend] = useState(false);
   const [control, setControl] = useState<ControlKind>();
   const [toast, setToast] = useState<string>();
+  const [view, setView] = useState<'board' | 'setup'>('board');
+  // First use: open Setup once, so there is somewhere to add keys and agents.
+  const setupInfo = useQuery({ queryKey: SETUP_KEY, queryFn: fetchSetup });
+  const [autoOpened, setAutoOpened] = useState(false);
+  useEffect(() => {
+    if (setupInfo.data?.firstRun && !autoOpened) {
+      setAutoOpened(true);
+      setView('setup');
+    }
+  }, [setupInfo.data?.firstRun, autoOpened]);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>(1);
   const cursorRef = useRef(cursor);
@@ -144,14 +159,24 @@ export function App() {
             </button>
           )}
           <span className={`pill ${connected ? 'ok' : 'bad'}`}>{connected ? 'stream on' : 'stream off'}</span>
+          <button type="button" className="pill" onClick={() => setView(view === 'setup' ? 'board' : 'setup')}>
+            {view === 'setup' ? 'Board' : 'Setup'}
+          </button>
           <button type="button" className="pill brain-pill" onClick={() => setOpenLocationId('brain:team-brain')}>
             Team Brain: {data?.brain.connected ? 'on' : 'soon'}
           </button>
         </div>
       </header>
 
-      <main className="layout">
-        <Roster agents={agents} turnsByAgent={turnsByAgent} at={at} selectedId={selected?.id} onSelect={setSelectedId} />
+      {view === 'setup' && <SetupScreen onBack={() => setView('board')} onDone={setToast} />}
+
+      <main className="layout" hidden={view === 'setup'}>
+        <div className="left-col">
+          <button type="button" className="pixel-btn legend-btn" onClick={() => setShowLegend(true)} aria-haspopup="dialog">
+            Legend
+          </button>
+          <Roster agents={agents} turnsByAgent={turnsByAgent} at={at} selectedId={selected?.id} onSelect={setSelectedId} />
+        </div>
 
         <div className="board-col">
           <Board
@@ -212,6 +237,8 @@ export function App() {
           onJump={jumpToAction}
         />
       )}
+
+      {showLegend && <Legend locations={locations} onClose={() => setShowLegend(false)} />}
 
       {control && selected && (
         <ControlDialog agent={selected} kind={control} onClose={() => setControl(undefined)} onDone={setToast} />

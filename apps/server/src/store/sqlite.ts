@@ -42,6 +42,14 @@ export class Store {
     return this.docs<Agent>('SELECT doc FROM agents ORDER BY id');
   }
 
+  /** Remove an agent and its recorded turns. */
+  deleteAgent(id: string) {
+    this.db.prepare('DELETE FROM turns WHERE agent_id = ?').run(id);
+    this.db.prepare('DELETE FROM agents WHERE id = ?').run(id);
+    // Per-agent adapter bookkeeping is keyed `<name>:<agent id>`.
+    this.db.prepare('DELETE FROM kv WHERE key LIKE ?').run(`%:${id}`);
+  }
+
   upsertLocation(location: Location) {
     this.db
       .prepare('INSERT INTO locations (id, doc) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET doc = excluded.doc')
@@ -85,6 +93,12 @@ export class Store {
   getKv<T>(key: string): T | undefined {
     const row = this.db.prepare('SELECT value FROM kv WHERE key = ?').get(key) as { value: string } | undefined;
     return row ? (JSON.parse(row.value) as T) : undefined;
+  }
+
+  /** Entries whose key starts with `prefix`. */
+  listKv<T>(prefix: string): { key: string; value: T }[] {
+    const rows = this.db.prepare('SELECT key, value FROM kv WHERE key LIKE ?').all(`${prefix}%`) as { key: string; value: string }[];
+    return rows.map((r) => ({ key: r.key, value: JSON.parse(r.value) as T }));
   }
 
   setKv(key: string, value: unknown) {

@@ -29,7 +29,7 @@ export function Roster({
               aria-pressed={agent.id === selectedId}
               style={{ ['--token-color' as string]: PLATFORM_COLORS[agent.platform] }}
             >
-              <AgentSprite color={PLATFORM_COLORS[agent.platform]} />
+              <AgentSprite color={PLATFORM_COLORS[agent.platform]} icon={agent.icon} size={28} />
               <span className="roster-text">
                 <span className="roster-name">{agent.name}</span>
                 <span className="muted">

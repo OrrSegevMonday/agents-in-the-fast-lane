@@ -2,6 +2,8 @@ import { BRAIN_LOCATION_ID, type Agent, type AgentAction, type Location } from '
 import { memo, useMemo } from 'react';
 import { STEP_MS, useWalk } from '../hooks/useWalk.ts';
 import { GRID, PLATFORM_COLORS, placeOf, slotCell, tokenOffset } from '../lib/board.ts';
+import { iconFor } from '../lib/agentIcons.ts';
+import { KIND_INFO } from '../lib/kinds.ts';
 import { AgentSprite, BuildingSprite } from './Sprites.tsx';
 
 interface BoardProps {
@@ -85,9 +87,15 @@ const Building = memo(function Building({
   style: React.CSSProperties;
   onOpen(id: string): void;
 }) {
-  const label = `${location.name}, ${location.kind}${visitors.length ? `, ${visitors.length} agent${visitors.length > 1 ? 's' : ''} here` : ''}. Open.`;
+  const label = `${location.name}, ${KIND_INFO[location.kind].label.toLowerCase()}${visitors.length ? `, ${visitors.length} agent${visitors.length > 1 ? 's' : ''} here` : ''}. Open.`;
   return (
-    <button type="button" className={`building kind-${location.kind}`} style={style} onClick={() => onOpen(location.id)} aria-label={label}>
+    <button
+      type="button"
+      className={`building kind-${location.kind}`}
+      style={{ ...style, ['--kind-color' as string]: KIND_INFO[location.kind].color }}
+      onClick={() => onOpen(location.id)}
+      aria-label={label}
+    >
       <BuildingSprite kind={location.kind} />
       <span className="building-name" title={location.name}>
         {location.name}
@@ -132,10 +140,10 @@ function Token({
         ['--token-color' as string]: color,
       }}
       onClick={() => onSelect(agent.id)}
-      aria-label={`${agent.name} (${agent.platform}), ${agent.status}${location ? `, at ${location.name}` : ''}. Select.`}
+      aria-label={`${agent.name} (${agent.platform}, ${iconFor(agent.icon).name.toLowerCase()}), ${agent.status}${location ? `, at ${location.name}` : ''}. Select.`}
       aria-pressed={selected}
     >
-      <AgentSprite color={color} />
+      <AgentSprite color={color} icon={agent.icon} size={26} />
       <span className="token-name">{agent.name}</span>
     </button>
   );

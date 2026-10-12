@@ -1,5 +1,6 @@
 import type { LocationKind } from '@aj/shared';
 import { memo } from 'react';
+import { iconFor } from '../lib/agentIcons.ts';
 
 type Palette = Record<string, string>;
 
@@ -136,13 +137,14 @@ export function BuildingSprite({ kind, size = 56 }: { kind: LocationKind; size?:
   return <PixelArt map={sprite.map} palette={sprite.palette} size={size} />;
 }
 
-/** A little walking figure tinted with the platform color. */
-export function AgentSprite({ color, size = 22 }: { color: string; size?: number }) {
+/** A little walking figure: body in the platform color, topped with the agent's own hat. */
+export function AgentSprite({ color, icon, size = 22 }: { color: string; icon?: number; size?: number }) {
   return (
     <PixelArt
       size={size}
-      palette={{ k: '#1b1b2f', s: '#ffd7b5', c: color, w: '#ffffff' }}
+      palette={{ k: '#1b1b2f', s: '#ffd7b5', c: color, w: '#ffffff', y: '#ffd166' }}
       map={[
+        ...iconFor(icon).hat,
         '..kkkk..',
         '.kssssk.',
         '.kswswk.',

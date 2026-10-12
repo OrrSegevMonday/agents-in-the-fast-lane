@@ -40,6 +40,8 @@ export interface Agent {
   url?: string;
   /** Set when the adapter could not reach its source on the last sync. */
   syncError?: string;
+  /** Which of the AGENT_ICON_COUNT player icons this agent wears; unique within its platform. */
+  icon?: number;
 }
 
 export type LocationKind = 'repo' | 'board' | 'tool' | 'service' | 'brain';
@@ -132,6 +134,8 @@ export type StreamEvent =
   | { type: 'brain'; brain: BrainStatus };
 
 export const BOARD_SLOTS = 16;
+/** Distinct player icons. Agents on the same platform share a color, so the icon tells them apart. */
+export const AGENT_ICON_COUNT = 20;
 export const BRAIN_LOCATION_ID = 'brain:team-brain';
 
 export const agentId = (platform: AgentPlatform, nativeId: string) => `${platform}:${nativeId}`;
