@@ -7,6 +7,7 @@ import {
   type Turn,
 } from '@aj/shared';
 import type { Config } from '../config.ts';
+import { sessionTurn, sessionStatus, type SpheraSession } from './sphera/sessions.ts';
 import { AdapterError, type AdapterContext, type AgentAdapter } from './types.ts';
 
 interface RawSpheraAgent {
@@ -26,8 +27,10 @@ interface PendingRun {
   repos: string[];
 }
 
-/** Undocumented history endpoints we try at startup. The first that answers wins. */
-const HISTORY_CANDIDATES = (id: string) => [`/agents/${id}/executions`, `/agents/${id}/runs`];
+/** Run history: each Sphera "session" is one run (chat, API or scheduled). */
+const SESSIONS_PATH = (id: string) => `/sessions?agentId=${encodeURIComponent(id)}`;
+const SESSION_PAGE = 50;
+const MAX_SESSIONS = 500;
 const RUN_WINDOW_MS = 60 * 60_000;
 const TIMEOUT_MS = 15_000;
 const PENDING_KEY = (id: string) => `sphera:pending:${id}`;
@@ -53,16 +56,16 @@ export class SpheraAdapter implements AgentAdapter {
     }
   }
 
+  /** Returns the run-history path if Sphera answers it for this agent, else null. */
   async probeHistory(id: string): Promise<string | null> {
-    for (const path of HISTORY_CANDIDATES(id)) {
-      try {
-        const res = await this.request(path);
-        if (res.ok && Array.isArray(await res.json())) return path;
-      } catch {
-        // Not available; try the next candidate.
-      }
+    try {
+      const res = await this.request(`${SESSIONS_PATH(id)}&limit=1`);
+      if (!res.ok) return null;
+      const body = (await res.json()) as { sessions?: unknown };
+      return Array.isArray(body.sessions) ? SESSIONS_PATH(id) : null;
+    } catch {
+      return null;
     }
-    return null;
   }
 
   async listAgents(ctx: AdapterContext): Promise<Agent[]> {
@@ -167,27 +170,46 @@ export class SpheraAdapter implements AgentAdapter {
     return { ok: true, message: `Run started for ${agent.name}`, runRef: body.executionUuid };
   }
 
-  /** Maps whatever the discovered history endpoint returns. Field names are guessed defensively. */
+  /**
+   * Turns from Sphera's run history. Each run's detail (the agent's own narration of what it
+   * did) is fetched once it finishes, and again only while it is still running.
+   */
   private async nativeTurns(agent: Agent, path: string, ctx: AdapterContext): Promise<Turn[]> {
-    const rows = (await (await this.ok(this.request(path))).json()) as Record<string, unknown>[];
-    const known = ctx.knownTurns(agent.id);
-    return rows.map((row, i) => {
-      const runId = String(row.executionUuid ?? row.uuid ?? row.id ?? i);
-      const turnId = `${agent.id}:exec-${runId}`;
-      const startedAt = String(row.startedAt ?? row.createdAt ?? row.created_at ?? new Date().toISOString());
-      const status = String(row.status ?? '').toLowerCase();
-      return {
-        id: turnId,
-        agentId: agent.id,
-        index: known.find((t) => t.id === turnId)?.index ?? i,
-        startedAt,
-        endedAt: (row.endedAt ?? row.finishedAt ?? row.completedAt) as string | undefined,
-        status: status.includes('fail') ? 'failed' : status.includes('run') || status.includes('pend') ? 'running' : 'succeeded',
-        trigger: String(row.trigger ?? row.triggerType ?? 'sphera'),
-        source: 'native',
-        actions: [],
-      } satisfies Turn;
-    });
+    const sessions: SpheraSession[] = [];
+    for (let offset = 0; offset < MAX_SESSIONS; offset += SESSION_PAGE) {
+      const res = await this.ok(this.request(`${path}&limit=${SESSION_PAGE}&offset=${offset}`));
+      const page = (await res.json()) as { sessions?: SpheraSession[]; total?: number };
+      sessions.push(...(page.sessions ?? []));
+      if (!page.sessions?.length || sessions.length >= (page.total ?? 0)) break;
+    }
+    sessions.sort((a, b) => (a.startedAt ?? a.createdAt).localeCompare(b.startedAt ?? b.createdAt));
+
+    // Runs started from this app keep the turn id we gave them when we triggered them.
+    const pending = this.kv.getKv<PendingRun[]>(PENDING_KEY(agent.id)) ?? [];
+    const known = new Map(ctx.knownTurns(agent.id).map((t) => [t.id, t]));
+    const ensure = (kind: Parameters<AdapterContext['locations']['ensure']>[0], ref: string, name: string) =>
+      ctx.locations.ensure(kind, ref, name).id;
+
+    const turns: Turn[] = [];
+    for (const [index, listed] of sessions.entries()) {
+      const fromApp = pending.find((p) => listed.uuid.includes(p.executionUuid));
+      const turnId = fromApp?.turnId ?? `${agent.id}:sess-${listed.uuid}`;
+      const existing = known.get(turnId);
+      const settled = existing && existing.status !== 'running' && existing.status !== 'pending' && existing.actions.length > 0;
+      if (settled && sessionStatus(listed) === existing.status) continue;
+
+      const detail = await this.sessionDetail(listed.uuid);
+      turns.push(sessionTurn(agent.id, { ...listed, ...detail }, index, ensure, turnId));
+    }
+
+    const done = new Set(sessions.flatMap((sess) => pending.filter((p) => sess.uuid.includes(p.executionUuid)).map((p) => p.turnId)));
+    if (done.size) this.kv.setKv(PENDING_KEY(agent.id), pending.filter((p) => !done.has(p.turnId)));
+    return turns;
+  }
+
+  private async sessionDetail(uuid: string): Promise<Partial<SpheraSession>> {
+    const res = await this.request(`/sessions/${encodeURIComponent(uuid)}`);
+    return res.ok ? ((await res.json()) as SpheraSession) : {};
   }
 
   /** Runs we triggered, filled in with GitHub activity in the context repos during the run window. */

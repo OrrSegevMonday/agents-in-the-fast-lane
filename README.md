@@ -42,7 +42,7 @@ After the first run the agent list lives in the local database; `MONDAY_AGENT_ID
 | Platform | Status | Turns come from | Controls |
 |---|---|---|---|
 | monday | live (`MONDAY_API_TOKEN`, `MONDAY_AGENT_IDS`, `MONDAY_ACCOUNT_URL`) | Runs started here: exact tool calls from `tool_events`. History: board activity logs on the boards named in the agent's job instructions, grouped into turns by 15-minute gaps | Pause/Resume = deactivate/activate. Run turn = run agent or job. Set goals = replace a job's instructions |
-| Sphera | live (`SPHERA_API_URL`, `SPHERA_AGENT_IDS`) | Probed history endpoint if one exists, else runs started here, filled from GitHub activity by `SPHERA_GITHUB_ACTOR` in the context repos | Pause/Resume = `enabled`. Run turn = `/trigger`. Set goals = PATCH `prompt` (owner-only prompts need `SPHERA_SESSION_COOKIE`) |
+| Sphera | live (`SPHERA_API_URL`, `SPHERA_AGENT_IDS`) | Run history from Sphera sessions (`/v2/sessions?agentId=…`): real start/end, status, trigger and cost per run. Steps come from the agent's own run summary, placed at the tools they name and tagged inferred. Without session access, only runs started here, filled from GitHub activity by `SPHERA_GITHUB_ACTOR` | Pause/Resume = `enabled`. Run turn = `/trigger`. Set goals = PATCH `prompt` (owner-only prompts need `SPHERA_SESSION_COOKIE`) |
 | Claude | mock | Deterministic generator | All, in memory |
 | Cursor | mock | Deterministic generator | All, in memory |
 
